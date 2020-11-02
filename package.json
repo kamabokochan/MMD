@@ -1,0 +1,12 @@
+{
+  "name": "mmd",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "dev": "http-server ./ -o"
+  },
+  "devDependencies": {
+    "http-server": "^0.12.3"
+  }
+}
