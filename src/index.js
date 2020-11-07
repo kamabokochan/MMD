@@ -7,11 +7,15 @@ import { OrbitControls } from './jsm/controls/OrbitControls.js';
 import { OutlineEffect } from './jsm/effects/OutlineEffect.js';
 import { MMDLoader } from './jsm/loaders/MMDLoader.js';
 import { MMDAnimationHelper } from './jsm/animation/MMDAnimationHelper.js';
+import { Sky } from './jsm/objects/Sky.js';
 
 let stats;
 
+// IK(Inverse Kinematics)
+
 let mesh, camera, scene, renderer, effect;
 let helper, ikHelper, physicsHelper;
+let sky, sun;
 
 const clock = new THREE.Clock();
 
@@ -24,6 +28,62 @@ Ammo().then( function ( AmmoLib ) {
 
 } );
 
+function initSky() {
+
+  // Add Sky
+  sky = new Sky();
+  sky.scale.setScalar( 450000 );
+  scene.add( sky );
+
+  sun = new THREE.Vector3();
+
+  /// GUI
+
+  const effectController = {
+    turbidity: 3,
+    rayleigh: 0.5,
+    mieCoefficient: 0.005,
+    mieDirectionalG: 0.7,
+    inclination: 0.1, // elevation / inclination
+    azimuth: 0.3, // Facing front,
+    exposure: renderer.toneMappingExposure
+  };
+
+  function guiChanged() {
+
+    const uniforms = sky.material.uniforms;
+    uniforms[ "turbidity" ].value = effectController.turbidity;
+    uniforms[ "rayleigh" ].value = effectController.rayleigh;
+    uniforms[ "mieCoefficient" ].value = effectController.mieCoefficient;
+    uniforms[ "mieDirectionalG" ].value = effectController.mieDirectionalG;
+
+    const theta = Math.PI * ( effectController.inclination - 0.5 );
+    const phi = 2 * Math.PI * ( effectController.azimuth - 0.5 );
+
+    sun.x = Math.cos( phi );
+    sun.y = Math.sin( phi ) * Math.sin( theta );
+    sun.z = Math.sin( phi ) * Math.cos( theta );
+
+    uniforms[ "sunPosition" ].value.copy( sun );
+
+    renderer.toneMappingExposure = effectController.exposure;
+    renderer.render( scene, camera );
+
+  }
+
+  const gui = new GUI();
+
+  gui.add( effectController, "turbidity", 0.0, 20.0, 0.1 ).onChange( guiChanged );
+  gui.add( effectController, "rayleigh", 0.0, 4, 0.001 ).onChange( guiChanged );
+  gui.add( effectController, "mieCoefficient", 0.0, 0.1, 0.001 ).onChange( guiChanged );
+  gui.add( effectController, "mieDirectionalG", 0.0, 1, 0.001 ).onChange( guiChanged );
+  gui.add( effectController, "inclination", 0, 1, 0.0001 ).onChange( guiChanged );
+  gui.add( effectController, "azimuth", 0, 1, 0.0001 ).onChange( guiChanged );
+  gui.add( effectController, "exposure", 0, 1, 0.0001 ).onChange( guiChanged );
+
+  guiChanged();
+
+}
 
 function init() {
 
@@ -38,9 +98,9 @@ function init() {
   scene = new THREE.Scene();
   scene.background = new THREE.Color( 0xffffff );
 
-  const gridHelper = new THREE.PolarGridHelper( 30, 10 );
-  gridHelper.position.y = - 10;
-  scene.add( gridHelper );
+  // const gridHelper = new THREE.PolarGridHelper( 30, 10 );
+  // gridHelper.position.y = - 10;
+  // scene.add( gridHelper );
 
   const ambient = new THREE.AmbientLight( 0x666666 );
   scene.add( ambient );
@@ -91,7 +151,7 @@ function init() {
   loader.loadWithAnimation( modelFile, vmdFiles, function ( mmd ) {
 
     mesh = mmd.mesh;
-    mesh.position.y = - 10;
+    mesh.position.y = - 9.5;
     scene.add( mesh );
 
     helper.add( mesh, {
@@ -109,11 +169,45 @@ function init() {
 
     initGui();
 
+  }, onProgress, null);
+  
+  loader.loadWithAnimation( '/models/kazii式煉獄杏寿郎ver2.0/煉獄杏寿郎(カフェ).pmx', vmdFiles, function ( mmd ) {
+
+    const mesh = mmd.mesh;
+    mesh.position.y = - 10;
+    mesh.position.x = - 10;
+    scene.add( mesh );
+
+    helper.add( mesh, {
+      animation: mmd.animation,
+      physics: true
+    } );
+
+  //   // IKを視覚化するヘルパークラス
+  //   ikHelper = helper.objects.get( mesh ).ikSolver.createHelper();
+  //   ikHelper.visible = false;
+  //   scene.add( ikHelper );
+
+  //   // physics(物理エンジン)を視覚化するヘルパークラス
+  //   physicsHelper = helper.objects.get( mesh ).physics.createHelper();
+  //   physicsHelper.visible = false;
+  //   scene.add( physicsHelper );
+
+  //   initGui();
+
   }, onProgress, null );
 
   const controls = new OrbitControls( camera, renderer.domElement );
   controls.minDistance = 10;
   controls.maxDistance = 100;
+
+  initSky();
+
+  const stage = '../models/円窓ステージ Ver.1.0/円窓ステージ.pmx';
+  loader.load(stage, (object) => {
+    object.position.y = -10;
+    scene.add(object);
+  });
 
   window.addEventListener( 'resize', onWindowResize, false );
 
